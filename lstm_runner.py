@@ -174,16 +174,17 @@ def main():
             metrics=['accuracy']
         )
 
-        print(model.summary())
+        if i == 0:
+            print(model.summary())
 
         history = model.fit(
             X_train, y_train,
             epochs=NB_EPOCHS,
             batch_size=BATCH_SIZE,
-            verbose=0,
+            verbose=1,
             validation_data=(X_val, y_val),
             callbacks=[
-                TQDMCallback(),
+                # TQDMCallback(),
                 ModelCheckpoint(
                     'model-lstm-%i.h5'%(i+1), monitor='val_loss', verbose=1, save_best_only=True, mode='min'
                 ),

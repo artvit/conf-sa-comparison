@@ -12,6 +12,7 @@ from keras import optimizers
 from keras.utils import plot_model, to_categorical
 from sklearn.model_selection import train_test_split
 from keras.datasets import imdb
+from keras_tqdm import TQDMCallback
 
 
 MAX_NUM_WORDS   = 15000
@@ -26,9 +27,9 @@ NB_CLASSES      = 2
 
 # LEARNING
 BATCH_SIZE      = 100
-NB_EPOCHS       = 10
+NB_EPOCHS       = 6
 RUNS            = 3
-VAL_SIZE        = 0.2
+VAL_SIZE        = 0.3
 
 
 def clean_doc(doc):
@@ -131,23 +132,6 @@ def plot_acc_loss(title, histories, key_acc, key_loss):
 
 
 def main():
-    # # Sentence polarity dataset v1.0
-    # negative_docs = read_files('data/rt-polaritydata/rt-polarity.neg')
-    # positive_docs = read_files('data/rt-polaritydata/rt-polarity.pos')
-
-    # # IMDB
-    # negative_docs = read_files('data/imdb/train/neg')
-    # positive_docs = read_files('data/imdb/train/pos')
-    negative_docs_test = read_files('data/imdb/test/neg')
-    positive_docs_test = read_files('data/imdb/test/pos')
-
-    # # Yelp
-    # negative_docs = read_files('data/yelp/neg.txt')
-    # positive_docs = read_files('data/yelp/pos.txt')
-    # negative_docs_test = negative_docs[300000:]
-    # positive_docs_test = positive_docs[300000:]
-    # negative_docs = negative_docs[:300000]
-    # positive_docs = positive_docs[:300000]
 
     (X_train, y_train), (X_test, y_test) = imdb.load_data(num_words=MAX_NUM_WORDS)
     X = np.concatenate((X_train, X_test), axis=0)
@@ -207,6 +191,9 @@ def main():
             metrics=['accuracy']
         )
 
+        if i == 0:
+            print(model.summary())
+
         history = model.fit(
             X_train, y_train,
             epochs=NB_EPOCHS,
@@ -214,6 +201,7 @@ def main():
             verbose=1,
             validation_data=(X_val, y_val),
             callbacks=[
+                # TQDMCallback(),
                 ModelCheckpoint(
                     'model-%i.h5'%(i+1), monitor='val_loss', verbose=1, save_best_only=True, mode='min'
                 ),

@@ -1,6 +1,5 @@
-from keras.layers import Activation, Input, Dense, Dropout, Embedding
+from keras.layers import Activation, Input, Dense, Dropout, Embedding, Conv1D, MaxPooling1D, GlobalMaxPooling1D, LSTM, LSTMCell, CuDNNLSTM
 from keras.layers.convolutional import SeparableConv1D
-from keras.layers import GlobalMaxPooling1D, LSTM, LSTMCell
 from keras.layers.merge import concatenate
 from keras.models import Model
 from keras import initializers, Sequential
@@ -58,18 +57,21 @@ class RNN:
                 name="word_embedding"
             )
         model.add(self.embedding_layer)
-
+        # model.add(Conv1D(filters=32, kernel_size=3, padding='same', activation='relu'))
+        # model.add(MaxPooling1D(pool_size=2))
         self.build_lstm(model)
         model.add(Dense(self.nb_classes, activation='softmax'))
         return model
 
     def build_lstm(self, model):
         for _ in range(self.lstm_layers - 1):
+            model.add(Dropout(self.dropout_rate))
             model.add(self.get_lstm_layer())
+        model.add(Dropout(self.dropout_rate))
         model.add(self.get_lstm_layer(True))
 
     def get_lstm_layer(self, last=False):
-        return LSTM(self.lstm_size,
-                    return_sequences=not last,
-                    dropout=self.dropout_rate,
-                    recurrent_dropout=self.dropout_rate)
+        return CuDNNLSTM(self.lstm_size,
+                         # dropout=self.dropout_rate,
+                         # recurrent_dropout=self.dropout_rate,
+                         return_sequences=not last)

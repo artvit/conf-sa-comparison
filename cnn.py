@@ -6,7 +6,7 @@ This implementation is based on the original paper of Yoon Kim [1].
 @author: Christopher Masch
 """
 
-from keras.layers import Activation, Input, Dense, Dropout, Embedding
+from keras.layers import Activation, Input, Dense, Dropout, Embedding, CuDNNLSTM, MaxPooling1D
 from keras.layers.convolutional import SeparableConv1D
 from keras.layers import GlobalMaxPooling1D
 from keras.layers.merge import concatenate
@@ -113,6 +113,8 @@ class CNN:
         x = SeparableConv1D(feature_map, kernel_size=filter_size, activation='relu', strides=1, padding='same',
                             depth_multiplier=4)(x)
         x = GlobalMaxPooling1D()(x)
+        # x = MaxPooling1D(filter_size)(x)
+        # x = CuDNNLSTM(100)(x)
         x = Dense(self.hidden_units)(x)
         x = Dropout(self.dropout_rate)(x)
         return x
