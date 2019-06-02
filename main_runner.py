@@ -1,9 +1,11 @@
-from cnn import CNN
+from lstm import RNN
+import pandas as pd
 import os, pickle, re, string
 import numpy as np
 import matplotlib.pyplot as plt
 from nltk.corpus import stopwords
 from keras.callbacks import ModelCheckpoint, TensorBoard
+import keras.preprocessing.text as kpt
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import load_model
@@ -14,20 +16,22 @@ from sklearn.model_selection import train_test_split
 from keras.datasets import imdb
 from keras_tqdm import TQDMCallback
 
+from textpreprocessing import normalize_corpus
 
-MAX_NUM_WORDS   = 15000
+
+MAX_NUM_WORDS   = 30000
 EMBEDDING_DIM   = 300
 MAX_SEQ_LENGTH  = 500
 USE_GLOVE       = False
-FILTER_SIZES    = [3, 4, 5]
-FEATURE_MAPS    = [200, 200, 200]
-DROPOUT_RATE    = 0.4
+LSTM_SIZE       = 100
+LSTM_LAYERS     = 1
+DROPOUT_RATE    = 0.1
 HIDDEN_UNITS    = 200
 NB_CLASSES      = 2
 
 # LEARNING
 BATCH_SIZE      = 100
-NB_EPOCHS       = 6
+NB_EPOCHS       = 5
 RUNS            = 3
 VAL_SIZE        = 0.3
 
@@ -77,37 +81,6 @@ def read_files(path):
                 documents.append(clean_doc(line))
     return documents
 
-# def create_glove_embeddings():
-#     print('Pretrained embeddings GloVe is loading...')
-#
-#     embeddings_index = {}
-#     f = open('glove.6B.%id.txt' % EMBEDDING_DIM)
-#     for line in f:
-#         values = line.split()
-#         word = values[0]
-#         coefs = np.asarray(values[1:], dtype='float32')
-#         embeddings_index[word] = coefs
-#     f.close()
-#     print('Found %s word vectors in GloVe embedding' % len(embeddings_index))
-#
-#     embedding_matrix = np.zeros((MAX_NUM_WORDS, EMBEDDING_DIM))
-#
-#     for word, i in tokenizer.word_index.items():
-#         if i >= MAX_NUM_WORDS:
-#             continue
-#         embedding_vector = embeddings_index.get(word)
-#         if embedding_vector is not None:
-#             embedding_matrix[i] = embedding_vector
-#
-#     return Embedding(
-#         input_dim=MAX_NUM_WORDS,
-#         output_dim=EMBEDDING_DIM,
-#         input_length=MAX_SEQ_LENGTH,
-#         weights=[embedding_matrix],
-#         trainable=True,
-#         name="word_embedding"
-#     )
-
 
 def plot_acc_loss(title, histories, key_acc, key_loss):
     fig, (ax1, ax2) = plt.subplots(1, 2)
@@ -115,7 +88,7 @@ def plot_acc_loss(title, histories, key_acc, key_loss):
     ax1.set_title('Model accuracy (%s)' % title)
     names = []
     for i, model in enumerate(histories):
-        ax1.plot(model[key_acc])
+        ax1.plot(range(1, 6), model[key_acc])
         ax1.set_xlabel('epoch')
         names.append('Model %i' % (i+1))
         ax1.set_ylabel('accuracy')
@@ -123,7 +96,7 @@ def plot_acc_loss(title, histories, key_acc, key_loss):
     # Loss
     ax2.set_title('Model loss (%s)' % title)
     for model in histories:
-        ax2.plot(model[key_loss])
+        ax2.plot(range(1, 6), model[key_loss])
         ax2.set_xlabel('epoch')
         ax2.set_ylabel('loss')
     ax2.legend(names, loc='upper right')
@@ -131,90 +104,8 @@ def plot_acc_loss(title, histories, key_acc, key_loss):
     plt.show()
 
 
-def main():
-
-    (X_train, y_train), (X_test, y_test) = imdb.load_data(num_words=MAX_NUM_WORDS)
-    X = np.concatenate((X_train, X_test), axis=0)
-    y = np.concatenate((y_train, y_test), axis=0)
-    labels = to_categorical(y)
-    print('Training samples: %i' % len(X))
-
-    # docs   = negative_docs + positive_docs
-    # labels = [0 for _ in range(len(negative_docs))] + [1 for _ in range(len(positive_docs))]
-
-    # labels = to_categorical(labels)
-    # print('Training samples: %i' % len(docs))
-
-    # tokenizer.fit_on_texts(docs)
-    # sequences = tokenizer.texts_to_sequences(docs)
-
-    # word_index = tokenizer.word_index
-
-    result = [len(x) for x in X]
-    print('Text informations:')
-    print('max length: %i / min length: %i / mean length: %i / limit length: %i' % (np.max(result),
-                                                                                    np.min(result),
-                                                                                    np.mean(result),
-                                                                                    MAX_SEQ_LENGTH))
-    # print('vacobulary size: %i / limit: %i' % (len(word_index), MAX_NUM_WORDS))
-
-    # Padding all sequences to same length of `MAX_SEQ_LENGTH`
-    data = pad_sequences(X, maxlen=MAX_SEQ_LENGTH, padding='post')
-
-    histories = []
-
-    for i in range(RUNS):
-        print('Running iteration %i/%i' % (i+1, RUNS))
-        random_state = np.random.randint(1000)
-
-        X_train, X_val, y_train, y_val = train_test_split(data, labels, test_size=VAL_SIZE, random_state=random_state)
-
-        emb_layer = None
-        # if USE_GLOVE:
-        #     emb_layer = create_glove_embeddings()
-
-        model = CNN(
-            embedding_layer = emb_layer,
-            num_words       = MAX_NUM_WORDS,
-            embedding_dim   = EMBEDDING_DIM,
-            filter_sizes    = FILTER_SIZES,
-            feature_maps    = FEATURE_MAPS,
-            max_seq_length  = MAX_SEQ_LENGTH,
-            dropout_rate    = DROPOUT_RATE,
-            hidden_units    = HIDDEN_UNITS,
-            nb_classes      = NB_CLASSES
-        ).build_model()
-
-        model.compile(
-            loss='categorical_crossentropy',
-            optimizer=optimizers.Adam(),
-            metrics=['accuracy']
-        )
-
-        if i == 0:
-            print(model.summary())
-            plot_model(model, to_file='cnn_model.png', show_layer_names=False, show_shapes=True)
-
-        history = model.fit(
-            X_train, y_train,
-            epochs=NB_EPOCHS,
-            batch_size=BATCH_SIZE,
-            verbose=1,
-            validation_data=(X_val, y_val),
-            callbacks=[
-                # TQDMCallback(),
-                ModelCheckpoint(
-                    'model-%i.h5'%(i+1), monitor='val_loss', verbose=1, save_best_only=True, mode='min'
-                ),
-                # TensorBoard(log_dir='./logs/temp', write_graph=True)
-            ]
-        )
-        print()
-        histories.append(history.history)
-
-    with open('history.pkl', 'wb') as f:
-        pickle.dump(histories, f)
-    histories = pickle.load(open('history.pkl', 'rb'))
+def show_results():
+    histories = pickle.load(open('history-lstm.pkl', 'rb'))
 
     def get_avg(histories, his_key):
         tmp = []
@@ -231,5 +122,89 @@ def main():
     plot_acc_loss('validation', histories, 'val_acc', 'val_loss')
 
 
+def main():
+
+    (X_train, y_train), (X_test, y_test) = imdb.load_data(num_words=MAX_NUM_WORDS)
+    X_train = pad_sequences(X_train, maxlen=MAX_SEQ_LENGTH)
+    X_test = pad_sequences(X_test, maxlen=MAX_SEQ_LENGTH)
+    X = np.concatenate((X_train, X_test), axis=0)
+    y = np.concatenate((y_train, y_test), axis=0)
+    y = to_categorical(y)
+    # print('Training samples: %i' % len(X))
+
+    # docs   = negative_docs + positive_docs
+    # labels = [0 for _ in range(len(negative_docs))] + [1 for _ in range(len(positive_docs))]
+
+    # labels = to_categorical(labels)
+    # print('Training samples: %i' % len(docs))
+
+    # tokenizer.fit_on_texts(docs)
+    # sequences = tokenizer.texts_to_sequences(docs)
+
+    # word_index = tokenizer.word_index
+
+    # result = [len(x) for x in X]
+    # print('Text informations:')
+    # print('max length: %i / min length: %i / mean length: %i / limit length: %i' % (np.max(result),
+    #                                                                                 np.min(result),
+    #                                                                                 np.mean(result),
+    #                                                                                 MAX_SEQ_LENGTH))
+    # print('vacobulary size: %i / limit: %i' % (len(word_index), MAX_NUM_WORDS))
+
+    # Padding all sequences to same length of `MAX_SEQ_LENGTH`
+    # data = pad_sequences(X, maxlen=MAX_SEQ_LENGTH, padding='post')
+
+    histories = []
+
+    for i in range(RUNS):
+        print('Running iteration %i/%i' % (i+1, RUNS))
+        random_state = np.random.randint(1000)
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=VAL_SIZE, random_state=random_state)
+
+        model = RNN(
+            num_words       = MAX_NUM_WORDS,
+            embedding_dim   = EMBEDDING_DIM,
+            lstm_size       = LSTM_SIZE,
+            lstm_layers     = LSTM_LAYERS,
+            max_seq_length  = MAX_SEQ_LENGTH,
+            dropout_rate    = DROPOUT_RATE,
+            hidden_units    = HIDDEN_UNITS,
+            nb_classes      = NB_CLASSES
+        ).build_model()
+
+        model.compile(
+            loss='categorical_crossentropy',
+            optimizer='adam',
+            metrics=['accuracy']
+        )
+
+        if i == 0:
+            print(model.summary())
+
+        history = model.fit(
+            X_train, y_train,
+            epochs=NB_EPOCHS,
+            batch_size=BATCH_SIZE,
+            verbose=1,
+            validation_data=(X_val, y_val),
+            callbacks=[
+                # TQDMCallback(),
+                ModelCheckpoint(
+                    'model-lstm-%i.h5'%(i+1), monitor='val_loss', verbose=1, save_best_only=True, mode='min'
+                ),
+                # TensorBoard(log_dir='./logs/temp', write_graph=True)
+            ]
+        )
+        print()
+        histories.append(history.history)
+
+    with open('history-lstm.pkl', 'wb') as f:
+        pickle.dump(histories, f)
+
+    show_results()
+
+
 if __name__ == '__main__':
+    # test()
     main()
+    # show_results()

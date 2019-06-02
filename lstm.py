@@ -49,6 +49,7 @@ class RNN:
 
         model = Sequential()
         # Building embeddings from scratch
+        input = Input(shape=(self.max_seq_length,), dtype='int32', name='word_input')
         if self.embedding_layer is None:
             self.embedding_layer = Embedding(
                 self.num_words,
@@ -56,19 +57,24 @@ class RNN:
                 input_length=self.max_seq_length,
                 name="word_embedding"
             )
-        model.add(self.embedding_layer)
+        x = self.embedding_layer(input)
+        # model.add(self.embedding_layer)
         # model.add(Conv1D(filters=32, kernel_size=3, padding='same', activation='relu'))
         # model.add(MaxPooling1D(pool_size=2))
-        self.build_lstm(model)
-        model.add(Dense(self.nb_classes, activation='softmax'))
-        return model
+        x = self.build_lstm(x)
+        x = Dense(100, activation='relu')(x)
+        x = Dropout(self.dropout_rate)(x)
+        output = Dense(self.nb_classes, activation='softmax')(x)
+        # model.add(Dense(self.nb_classes, activation='softmax'))
+        return Model(input, output)
 
-    def build_lstm(self, model):
+    def build_lstm(self, x):
         for _ in range(self.lstm_layers - 1):
-            model.add(Dropout(self.dropout_rate))
-            model.add(self.get_lstm_layer())
-        model.add(Dropout(self.dropout_rate))
-        model.add(self.get_lstm_layer(True))
+            x = self.get_lstm_layer()(x)
+            x = Dropout(self.dropout_rate)(x)
+        x = self.get_lstm_layer(True)(x)
+        x = Dropout(self.dropout_rate)(x)
+        return x
 
     def get_lstm_layer(self, last=False):
         return CuDNNLSTM(self.lstm_size,

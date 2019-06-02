@@ -15,11 +15,11 @@ from keras.datasets import imdb
 from keras_tqdm import TQDMCallback
 
 
-MAX_NUM_WORDS   = 15000
+MAX_NUM_WORDS   = 25000
 EMBEDDING_DIM   = 300
 MAX_SEQ_LENGTH  = 500
 USE_GLOVE       = False
-LSTM_SIZE       = 100
+LSTM_SIZE       = 200
 LSTM_LAYERS     = 1
 DROPOUT_RATE    = 0.1
 HIDDEN_UNITS    = 200
@@ -27,7 +27,7 @@ NB_CLASSES      = 2
 
 # LEARNING
 BATCH_SIZE      = 100
-NB_EPOCHS       = 5
+NB_EPOCHS       = 6
 RUNS            = 3
 VAL_SIZE        = 0.3
 
@@ -84,7 +84,7 @@ def plot_acc_loss(title, histories, key_acc, key_loss):
     ax1.set_title('Model accuracy (%s)' % title)
     names = []
     for i, model in enumerate(histories):
-        ax1.plot(range(1, 6), model[key_acc])
+        ax1.plot(range(1, 7), model[key_acc])
         ax1.set_xlabel('epoch')
         names.append('Model %i' % (i+1))
         ax1.set_ylabel('accuracy')
@@ -92,7 +92,7 @@ def plot_acc_loss(title, histories, key_acc, key_loss):
     # Loss
     ax2.set_title('Model loss (%s)' % title)
     for model in histories:
-        ax2.plot(range(1, 6), model[key_loss])
+        ax2.plot(range(1, 7), model[key_loss])
         ax2.set_xlabel('epoch')
         ax2.set_ylabel('loss')
     ax2.legend(names, loc='upper right')
@@ -176,6 +176,7 @@ def main():
 
         if i == 0:
             print(model.summary())
+            plot_model(model, to_file='lstm_model.png', show_layer_names=False, show_shapes=True)
 
         history = model.fit(
             X_train, y_train,
