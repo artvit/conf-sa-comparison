@@ -1,23 +1,12 @@
-"""
-CNN model for text classification
-This implementation is based on the original paper of Yoon Kim [1].
-# References
-- [1] [Convolutional Neural Networks for Sentence Classification](https://arxiv.org/abs/1408.5882)
-@author: Christopher Masch
-"""
-
 from keras.layers import Activation, Input, Dense, Dropout, Embedding, CuDNNLSTM, MaxPooling1D
 from keras.layers.convolutional import SeparableConv1D
 from keras.layers import GlobalMaxPooling1D
 from keras.layers.merge import concatenate
 from keras.models import Model
 from keras import initializers
-from keras import backend as K
 
 
 class CNN:
-
-    __version__ = '0.0.2'
 
     def __init__(self, embedding_layer=None, num_words=None, embedding_dim=None,
                  max_seq_length=100, filter_sizes=[3, 4, 5], feature_maps=[100, 100, 100],
@@ -113,8 +102,6 @@ class CNN:
         x = SeparableConv1D(feature_map, kernel_size=filter_size, activation='relu', strides=1, padding='same',
                             depth_multiplier=4)(x)
         x = GlobalMaxPooling1D()(x)
-        # x = MaxPooling1D(filter_size)(x)
-        # x = CuDNNLSTM(100)(x)
         x = Dense(self.hidden_units)(x)
         x = Dropout(self.dropout_rate)(x)
         return x
